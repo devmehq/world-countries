@@ -1,0 +1,67 @@
+name: Release to Packagist
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to publish'
+        required: true
+        type: string
+
+jobs:
+  publish-packagist:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        
+    - name: Setup PHP
+      uses: shivammathur/setup-php@v2
+      with:
+        php-version: '8.2'
+        tools: composer:v2
+        coverage: none
+        
+    - name: Validate composer.json
+      run: composer validate --strict
+        
+    - name: Install dependencies
+      run: composer install --prefer-dist --no-progress
+        
+    - name: Run tests
+      run: |
+        if [ -f "vendor/bin/phpunit" ]; then
+          vendor/bin/phpunit tests/php/
+        else
+          echo "PHPUnit not installed, skipping PHP tests"
+        fi
+        
+    - name: Update version if manual trigger
+      if: github.event_name == 'workflow_dispatch'
+      run: |
+        # Update version in composer.json if needed
+        # Packagist typically uses git tags for versioning
+        git config user.name github-actions
+        git config user.email github-actions@github.com
+        git tag -a v${{ inputs.version }} -m "Release v${{ inputs.version }}"
+        git push origin v${{ inputs.version }}
+        
+    # Packagist auto-updates from GitHub webhooks
+    # No explicit publish step needed if webhook is configured
+    # Alternative: Use Packagist API
+    - name: Notify Packagist
+      run: |
+        if [ -n "${{ secrets.PACKAGIST_USERNAME }}" ] && [ -n "${{ secrets.PACKAGIST_TOKEN }}" ]; then
+          curl -XPOST -H "Content-Type: application/json" \
+          -d '{"repository":{"url":"https://github.com/${{ github.repository }}"}}' \
+          "https://packagist.org/api/update-package?username=${{ secrets.PACKAGIST_USERNAME }}&apiToken=${{ secrets.PACKAGIST_TOKEN }}"
+        else
+          echo "Packagist credentials not configured, skipping API notification"
+          echo "Package will be updated via webhook if configured"
+        fi

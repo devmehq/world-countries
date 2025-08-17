@@ -1,0 +1,132 @@
+name: Release to All Platforms
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g., 1.0.0)'
+        required: true
+        type: string
+
+jobs:
+  create-release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      release-id: ${{ steps.create-release.outputs.id }}
+      
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Create GitHub Release
+      id: create-release
+      if: github.event_name == 'workflow_dispatch'
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: v${{ inputs.version }}
+        release_name: Release v${{ inputs.version }}
+        body: |
+          Release v${{ inputs.version }}
+          
+          ## Changes
+          - Updated world countries data
+          - Bug fixes and improvements
+          
+          ## Installation
+          
+          ### NPM (Node.js/TypeScript)
+          ```bash
+          npm install @devmehq/world-countries
+          ```
+          
+          ### Composer (PHP)
+          ```bash
+          composer require devmehq/world-countries
+          ```
+          
+          ### RubyGems (Ruby)
+          ```bash
+          gem install devme-world-countries
+          ```
+          
+          ### PyPI (Python)
+          ```bash
+          pip install devme-world-countries
+          ```
+        draft: false
+        prerelease: false
+
+  npm-publish:
+    needs: create-release
+    if: always()
+    uses: ./.github/workflows/release-npm.yml
+    with:
+      version: ${{ inputs.version || github.ref_name }}
+    secrets: inherit
+
+  pypi-publish:
+    needs: create-release
+    if: always()
+    uses: ./.github/workflows/release-pypi.yml
+    with:
+      version: ${{ inputs.version || github.ref_name }}
+    secrets: inherit
+
+  rubygems-publish:
+    needs: create-release
+    if: always()
+    uses: ./.github/workflows/release-rubygems.yml
+    with:
+      version: ${{ inputs.version || github.ref_name }}
+    secrets: inherit
+
+  packagist-notify:
+    needs: create-release
+    if: always()
+    uses: ./.github/workflows/release-packagist.yml
+    with:
+      version: ${{ inputs.version || github.ref_name }}
+    secrets: inherit
+
+  release-summary:
+    needs: [npm-publish, pypi-publish, rubygems-publish, packagist-notify]
+    runs-on: ubuntu-latest
+    if: always()
+    
+    steps:
+    - name: Release Summary
+      run: |
+        echo "## 🚀 Release Summary" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "| Platform | Status |" >> $GITHUB_STEP_SUMMARY
+        echo "|----------|--------|" >> $GITHUB_STEP_SUMMARY
+        
+        if [ "${{ needs.npm-publish.result }}" = "success" ]; then
+          echo "| NPM | ✅ Published |" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "| NPM | ❌ Failed |" >> $GITHUB_STEP_SUMMARY
+        fi
+        
+        if [ "${{ needs.pypi-publish.result }}" = "success" ]; then
+          echo "| PyPI | ✅ Published |" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "| PyPI | ❌ Failed |" >> $GITHUB_STEP_SUMMARY
+        fi
+        
+        if [ "${{ needs.rubygems-publish.result }}" = "success" ]; then
+          echo "| RubyGems | ✅ Published |" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "| RubyGems | ❌ Failed |" >> $GITHUB_STEP_SUMMARY
+        fi
+        
+        if [ "${{ needs.packagist-notify.result }}" = "success" ]; then
+          echo "| Packagist | ✅ Notified |" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "| Packagist | ❌ Failed |" >> $GITHUB_STEP_SUMMARY
+        fi

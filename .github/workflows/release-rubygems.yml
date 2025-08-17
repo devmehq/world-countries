@@ -1,0 +1,57 @@
+name: Release to RubyGems
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to publish'
+        required: true
+        type: string
+
+jobs:
+  publish-rubygems:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      
+    steps:
+    - uses: actions/checkout@v4
+      
+    - name: Setup Ruby
+      uses: ruby/setup-ruby@v1
+      with:
+        ruby-version: '3.2'
+        bundler-cache: false
+      
+    - name: Install dependencies
+      run: |
+        if [ -f "Gemfile" ]; then bundle install; fi
+      
+    - name: Run tests
+      run: |
+        if [ -f "Gemfile" ] && grep -q "rspec" Gemfile; then
+          bundle exec rspec tests/ruby/
+        else
+          ruby tests/ruby/test_world_countries.rb
+        fi
+      
+    - name: Update version if manual trigger
+      if: github.event_name == 'workflow_dispatch'
+      run: |
+        sed -i "s/spec.version.*=.*/spec.version = '${{ inputs.version }}'/\" world_countries.gemspec
+      
+    - name: Build gem
+      run: gem build world_countries.gemspec
+      
+    - name: Setup credentials
+      run: |
+        mkdir -p ~/.gem
+        echo "---" > ~/.gem/credentials
+        echo ":rubygems_api_key: ${{ secrets.RUBYGEMS_API_KEY }}" >> ~/.gem/credentials
+        chmod 0600 ~/.gem/credentials
+      
+    - name: Publish to RubyGems
+      run: |
+        gem push devme-world-countries-*.gem
