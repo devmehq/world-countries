@@ -1,0 +1,37 @@
+# Source files
+src/
+tests/
+
+# Config files
+tsconfig.json
+.eslintrc*
+.prettierrc*
+jest.config.*
+
+# Development files
+*.ts
+!*.d.ts
+
+# Other language implementations
+*.php
+*.rb
+*.py
+composer.json
+Gemfile
+pyproject.toml
+world_countries.gemspec
+
+# Git and CI
+.git/
+.github/
+.gitignore
+
+# IDE
+.vscode/
+.idea/
+
+# Misc
+*.log
+.DS_Store
+coverage/
+.nyc_output/
