@@ -20,7 +20,7 @@ jobs:
       release-id: ${{ steps.create-release.outputs.id }}
       
     steps:
-    - uses: actions/checkout@v5
+    - uses: actions/checkout@v6
     
     - name: Create GitHub Release
       id: create-release
